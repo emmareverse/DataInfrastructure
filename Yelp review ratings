@@ -1,0 +1,36 @@
+WITH t1 AS
+(
+SELECT  	user_id,
+		COUNT(*)
+FROM 		review
+GROUP BY 	user_id
+HAVING 	COUNT(*) >= 10
+),
+t2 AS
+(
+SELECT 	TIMESTAMP(B.date) AS CurDate,
+		FIRST_VALUE(B.stars) OVER (PARTITION BY B.user_id 							  	   ORDER BY TIMESTAMP(date)
+                                      ) AS NS,
+		ROW_NUMBER() OVER(PARTITION BY B.user_id 
+					ORDER BY TIMESTAMP(date)
+				     ) AS ReviewNum,
+		LEAD(TIMESTAMP(date)) OVER(PARTITION BY B.user_id 
+						   ORDER BY TIMESTAMP(date)
+						  ) AS NextDate
+FROM 		t1 AS A
+INNER JOIN	review as B
+ON 		A.user_id = B.user_id
+)
+SELECT 	ReviewNum, 
+		AVG(CASE 
+		    WHEN NS < 4 THEN DATEDIFF(NextDate,CurDate) 
+		    ELSE NULL END
+		   ) AS AvgTimeTilNextLow,
+		AVG(CASE 
+		    WHEN NS >= 4 THEN DATEDIFF(NextDate,CurDate) 
+		    ELSE NULL END
+               ) AS AvgTimeTilNextHigh
+FROM 		t2
+WHERE 	ReviewNum <= 9
+GROUP BY 	ReviewNum
+ORDER BY 	ReviewNum;
